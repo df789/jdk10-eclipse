@@ -16,32 +16,45 @@
 
 package io.guise.framework.platform.web;
 
-import java.io.*;
+import static com.globalmentor.java.CharSequences.join;
+import static com.globalmentor.w3c.spec.HTML.ATTRIBUTE_CLASS;
+import static com.globalmentor.w3c.spec.HTML.ELEMENT_DIV;
+import static com.globalmentor.w3c.spec.HTML.XHTML_NAMESPACE_URI;
+import static com.globalmentor.w3c.spec.HTML.XHTML_XML_EXTERNAL_PARSED_ENTITY_SUBTYPE;
+import static com.globalmentor.w3c.spec.XML.ATTRIBUTE_XMLNS;
+import static com.globalmentor.w3c.spec.XML.XMLNS_NAMESPACE_URI;
+import static com.globalmentor.xml.XML.createDocumentBuilder;
+import static com.globalmentor.xml.XML.isXML;
+import static com.globalmentor.xml.XML.isXMLExternalParsedEntity;
+import static com.globalmentor.xml.xhtml.XHTML.isHTML;
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.util.Objects.requireNonNull;
+
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
-import java.util.*;
+import java.util.Map;
 
-import static java.util.Objects.*;
+import javax.xml.parsers.DocumentBuilder;
 
-import javax.xml.parsers.*;
+import org.w3c.dom.Attr;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.NamedNodeMap;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
+import org.xml.sax.SAXException;
 
-import com.globalmentor.collections.*;
+import com.globalmentor.collections.DecoratorReadWriteLockMap;
+import com.globalmentor.collections.PurgeOnWriteSoftValueHashMap;
+import com.globalmentor.log.Log;
 import com.globalmentor.net.ContentType;
 
-import io.guise.framework.component.*;
+import io.guise.framework.component.Component;
+import io.guise.framework.component.SectionComponent;
 import io.guise.framework.component.SectionComponent.SectionType;
-
-import static com.globalmentor.java.CharSequences.*;
-
-import com.globalmentor.log.Log;
-
-import static com.globalmentor.w3c.spec.HTML.*;
-import static com.globalmentor.w3c.spec.XML.*;
-import static com.globalmentor.xml.XML.*;
-import static com.globalmentor.xml.xhtml.XHTML.*;
-import static java.nio.charset.StandardCharsets.*;
-
-import org.w3c.dom.*;
-import org.xml.sax.SAXException;
+import io.guise.framework.component.TextBox;
 
 /**
  * Strategy for rendering a text component as an XHTML <code>&lt;div&gt;</code> element or, based upon {@link TextBox#getTextContentType()}, a specialized XHTML
@@ -61,7 +74,7 @@ public class WebTextBoxDepictor<C extends TextBox> extends AbstractSimpleWebComp
 	private static final String XHTML11_FRAGMENT_DOCUMENT_SUFFIX = "</body>" + "</html>";
 
 	/** A thread-safe cache of softly-referenced XML documents keyed to hashes of the strings with which the documents are associated. */
-	private static final Map<Integer, CachedDocument> cachedDocumentMap = new DecoratorReadWriteLockMap<Integer, CachedDocument>(
+	private static final Map<Integer, CachedDocument> cachedDocumentMap = new DecoratorReadWriteLockMap<>(
 			new PurgeOnWriteSoftValueHashMap<Integer, CachedDocument>());
 
 	/** Default constructor using the XHTML <code>&lt;div&gt;</code> element. */

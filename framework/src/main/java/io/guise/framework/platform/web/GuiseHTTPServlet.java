@@ -16,80 +16,209 @@
 
 package io.guise.framework.platform.web;
 
-import java.io.*;
+import static com.globalmentor.io.Files.addExtension;
+import static com.globalmentor.io.Files.getFilename;
+import static com.globalmentor.java.Enums.getSerializationName;
+import static com.globalmentor.java.Enums.getSerializedEnum;
+import static com.globalmentor.java.Objects.asInstance;
+import static com.globalmentor.java.Threads.call;
+import static com.globalmentor.net.HTTP.GET_METHOD;
+import static com.globalmentor.net.HTTP.POST_METHOD;
+import static com.globalmentor.net.URIs.PATH_SEPARATOR;
+import static com.globalmentor.net.URIs.QUERY_NAME_VALUE_PAIR_DELIMITER;
+import static com.globalmentor.net.URIs.ROOT_PATH;
+import static com.globalmentor.net.URIs.appendQueryParameter;
+import static com.globalmentor.net.URIs.appendRawQuery;
+import static com.globalmentor.net.URIs.changePath;
+import static com.globalmentor.net.URIs.encode;
+import static com.globalmentor.net.URIs.getName;
+import static com.globalmentor.net.URIs.getParameters;
+import static com.globalmentor.net.URIs.getPlainURI;
+import static com.globalmentor.net.URIs.isAbsolutePath;
+import static com.globalmentor.net.URIs.normalizePath;
+import static com.globalmentor.net.URIs.resolve;
+import static com.globalmentor.servlet.Servlets.DATA_DIRECTORY_INIT_PARAMETER;
+import static com.globalmentor.servlet.Servlets.LOG_DIRECTORY_INIT_PARAMETER;
+import static com.globalmentor.servlet.Servlets.TEMP_DIRECTORY_INIT_PARAMETER;
+import static com.globalmentor.servlet.Servlets.WEB_INF_DIRECTORY_PATH;
+import static com.globalmentor.servlet.Servlets.getDataDirectory;
+import static com.globalmentor.servlet.http.HTTPServlets.SESSION_ID_COOKIE_NAME;
+import static com.globalmentor.servlet.http.HTTPServlets.USER_AGENT_NAME_MSIE;
+import static com.globalmentor.servlet.http.HTTPServlets.USER_AGENT_NAME_PROPERTY;
+import static com.globalmentor.servlet.http.HTTPServlets.getCompressedOutputStream;
+import static com.globalmentor.servlet.http.HTTPServlets.getRawPathInfo;
+import static com.globalmentor.servlet.http.HTTPServlets.getUserAgent;
+import static com.globalmentor.servlet.http.HTTPServlets.getUserAgentProperties;
+import static com.globalmentor.servlet.http.HTTPServlets.setContentDescription;
+import static com.globalmentor.servlet.http.HTTPServlets.setContentDisposition;
+import static com.globalmentor.servlet.http.HTTPServlets.setNoCache;
+import static com.globalmentor.text.elff.WebTrendsConstants.BROWSER_SIZE_QUERY_ATTRIBUTE_NAME;
+import static com.globalmentor.text.elff.WebTrendsConstants.BROWSING_HOUR_QUERY_ATTRIBUTE_NAME;
+import static com.globalmentor.text.elff.WebTrendsConstants.COLOR_DEPTH_QUERY_ATTRIBUTE_NAME;
+import static com.globalmentor.text.elff.WebTrendsConstants.CONTENT_GROUP_NAME_QUERY_ATTRIBUTE_NAME;
+import static com.globalmentor.text.elff.WebTrendsConstants.CONTENT_SUBGROUP_NAME_QUERY_ATTRIBUTE_NAME;
+import static com.globalmentor.text.elff.WebTrendsConstants.JAVASCRIPT_QUERY_ATTRIBUTE_NAME;
+import static com.globalmentor.text.elff.WebTrendsConstants.JAVASCRIPT_VERSION_QUERY_ATTRIBUTE_NAME;
+import static com.globalmentor.text.elff.WebTrendsConstants.JAVA_ENABLED_QUERY_ATTRIBUTE_NAME;
+import static com.globalmentor.text.elff.WebTrendsConstants.SCREEN_RESOLUTION_QUERY_ATTRIBUTE_NAME;
+import static com.globalmentor.text.elff.WebTrendsConstants.TIMEZONE_QUERY_ATTRIBUTE_NAME;
+import static com.globalmentor.text.elff.WebTrendsConstants.TITLE_QUERY_ATTRIBUTE_NAME;
+import static com.globalmentor.text.elff.WebTrendsConstants.USER_LANGUAGE_QUERY_ATTRIBUTE_NAME;
+import static com.globalmentor.text.elff.WebTrendsConstants.WEBTRENDS_ID_COOKIE_NAME;
+import static com.globalmentor.time.TimeZones.getTimeZone;
+import static com.globalmentor.w3c.spec.HTML.APPLICATION_X_WWW_FORM_URLENCODED_CONTENT_TYPE;
+import static com.globalmentor.w3c.spec.HTML.XHTML_NAMESPACE_URI;
+import static com.globalmentor.w3c.spec.XML.ATTRIBUTE_XMLNS;
+import static com.globalmentor.w3c.spec.XML.XMLNS_NAMESPACE_URI;
+import static io.guise.framework.platform.web.WebPlatform.GUISE_ML_NAMESPACE_PREFIX;
+import static io.guise.framework.platform.web.WebPlatform.GUISE_ML_NAMESPACE_URI;
+import static io.guise.framework.platform.web.adobe.Flash.FILEDATA_FORM_FIELD_NAME;
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.util.Collections.addAll;
+import static java.util.Objects.requireNonNull;
+import static org.urframework.content.Content.setContentType;
+import static org.urframework.dcmi.DCMI.getDescription;
+
+import java.io.BufferedInputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.Writer;
 import java.lang.reflect.UndeclaredThrowableException;
-import java.net.*;
+import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.security.Principal;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Date;
+import java.util.EnumSet;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Queue;
+import java.util.Set;
+import java.util.TimeZone;
 
-import static java.nio.charset.StandardCharsets.*;
-import static java.util.Collections.*;
-import static java.util.Objects.*;
+import javax.servlet.ServletConfig;
+import javax.servlet.ServletContext;
+import javax.servlet.ServletException;
+import javax.servlet.http.Cookie;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
 
-import static org.urframework.content.Content.*;
-import static org.urframework.dcmi.DCMI.*;
-
-import javax.servlet.*;
-import javax.servlet.http.*;
-import javax.xml.parsers.*;
+import org.apache.commons.fileupload.FileItem;
+import org.apache.commons.fileupload.FileItemIterator;
+import org.apache.commons.fileupload.FileItemStream;
+import org.apache.commons.fileupload.FileUploadException;
+import org.apache.commons.fileupload.disk.DiskFileItemFactory;
+import org.apache.commons.fileupload.servlet.ServletFileUpload;
+import org.ploop.graph.PLOOPTURFIO;
+import org.urframework.DefaultURFResource;
+import org.urframework.TURF;
+import org.urframework.URFResource;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
+import org.xml.sax.SAXException;
 
 import com.globalmentor.collections.CollectionMap;
 import com.globalmentor.collections.Collections;
 import com.globalmentor.event.ProgressEvent;
 import com.globalmentor.event.ProgressListener;
-import com.globalmentor.io.*;
+import com.globalmentor.io.Files;
+import com.globalmentor.io.IOOperation;
+import com.globalmentor.io.ProgressOutputStream;
+import com.globalmentor.io.Streams;
 import com.globalmentor.java.Objects;
 import com.globalmentor.javascript.JSON;
 import com.globalmentor.log.Log;
 import com.globalmentor.model.NameValuePair;
 import com.globalmentor.model.ObjectHolder;
 import com.globalmentor.model.TaskState;
-import com.globalmentor.net.*;
-import com.globalmentor.net.http.*;
+import com.globalmentor.net.ContentType;
+import com.globalmentor.net.ResourceIOException;
+import com.globalmentor.net.ResourceNotFoundException;
+import com.globalmentor.net.URIPath;
+import com.globalmentor.net.URIs;
+import com.globalmentor.net.http.AuthenticateCredentials;
+import com.globalmentor.net.http.HTTPException;
+import com.globalmentor.net.http.HTTPForbiddenException;
+import com.globalmentor.net.http.HTTPInternalServerErrorException;
+import com.globalmentor.net.http.HTTPMovedPermanentlyException;
+import com.globalmentor.net.http.HTTPMovedTemporarilyException;
+import com.globalmentor.net.http.HTTPNotFoundException;
+import com.globalmentor.net.http.HTTPRedirectException;
 import com.globalmentor.net.mime.ContentDispositionType;
 import com.globalmentor.security.Nonce;
 import com.globalmentor.servlet.Servlets;
-import com.globalmentor.servlet.http.*;
-import com.globalmentor.text.elff.*;
-import com.globalmentor.w3c.spec.HTML;
+import com.globalmentor.servlet.http.BaseHTTPServlet;
+import com.globalmentor.servlet.http.DefaultHTTPServlet;
+import com.globalmentor.text.elff.ELFF;
+import com.globalmentor.text.elff.Entry;
+import com.globalmentor.text.elff.Field;
+import com.globalmentor.text.elff.WebTrendsYesNo;
 import com.globalmentor.w3c.spec.XML;
-import com.globalmentor.xml.xpath.*;
+import com.globalmentor.xml.xpath.PathExpression;
+import com.globalmentor.xml.xpath.XPath;
 
-import io.guise.framework.*;
-import io.guise.framework.component.*;
-import io.guise.framework.event.*;
-import io.guise.framework.geometry.*;
+import io.guise.framework.AbstractGuiseApplication;
+import io.guise.framework.Bookmark;
+import io.guise.framework.Category;
+import io.guise.framework.ComponentDestination;
+import io.guise.framework.Destination;
+import io.guise.framework.Guise;
+import io.guise.framework.GuiseApplication;
+import io.guise.framework.GuiseContainer;
+import io.guise.framework.GuiseSession;
+import io.guise.framework.GuiseSessionThreadGroup;
+import io.guise.framework.ModalNavigation;
+import io.guise.framework.Navigation;
+import io.guise.framework.PermanentRedirectDestination;
+import io.guise.framework.RedirectDestination;
+import io.guise.framework.ReferenceDestination;
+import io.guise.framework.ResourceReadDestination;
+import io.guise.framework.ResourceWriteDestination;
+import io.guise.framework.TemporaryRedirectDestination;
+import io.guise.framework.component.AbstractComponent;
+import io.guise.framework.component.ApplicationFrame;
+import io.guise.framework.component.Component;
+import io.guise.framework.component.CompositeComponent;
+import io.guise.framework.component.FlyoverFrame;
+import io.guise.framework.component.Frame;
+import io.guise.framework.component.ModalNavigationPanel;
+import io.guise.framework.event.GuiseEvent;
+import io.guise.framework.event.InputEvent;
+import io.guise.framework.event.KeyPressEvent;
+import io.guise.framework.event.KeyReleaseEvent;
+import io.guise.framework.event.KeyboardEvent;
+import io.guise.framework.event.MouseClickEvent;
+import io.guise.framework.event.MouseEnterEvent;
+import io.guise.framework.event.MouseEvent;
+import io.guise.framework.event.MouseExitEvent;
+import io.guise.framework.geometry.Point;
+import io.guise.framework.geometry.Rectangle;
 import io.guise.framework.input.Key;
 import io.guise.framework.model.FileItemResourceImport;
-import io.guise.framework.platform.*;
+import io.guise.framework.platform.DefaultProduct;
+import io.guise.framework.platform.DepictContext;
+import io.guise.framework.platform.DepictEvent;
+import io.guise.framework.platform.DepictedObject;
+import io.guise.framework.platform.Environment;
+import io.guise.framework.platform.PlatformDropEvent;
+import io.guise.framework.platform.PlatformFocusEvent;
+import io.guise.framework.platform.Product;
 import io.guise.framework.platform.web.WebPlatform.PollCommand;
-import io.guise.framework.platform.web.css.*;
-
-import static com.globalmentor.io.Files.*;
-import static com.globalmentor.java.Enums.*;
-import static com.globalmentor.java.Objects.*;
-import static com.globalmentor.java.Threads.*;
-import static com.globalmentor.net.URIs.*;
-import static com.globalmentor.net.HTTP.*;
-import static com.globalmentor.servlet.Servlets.*;
-import static com.globalmentor.servlet.http.HTTPServlets.*;
-import static com.globalmentor.text.elff.WebTrendsConstants.*;
-import static com.globalmentor.time.TimeZones.*;
-import static com.globalmentor.w3c.spec.CSS.*;
-import static com.globalmentor.w3c.spec.HTML.*;
-import static com.globalmentor.w3c.spec.XML.*;
-import static io.guise.framework.platform.web.WebPlatform.*;
-import static io.guise.framework.platform.web.WebUserAgentProduct.Brand.*;
-import static io.guise.framework.platform.web.adobe.Flash.*;
-
-import org.apache.commons.fileupload.*;
-import org.apache.commons.fileupload.disk.DiskFileItemFactory;
-import org.apache.commons.fileupload.servlet.ServletFileUpload;
-import org.ploop.*;
-import org.ploop.graph.PLOOPTURFIO;
-import org.urframework.*;
-import org.w3c.dom.*;
-import org.xml.sax.SAXException;
 
 /**
  * The servlet that controls a Guise web applications. Each Guise session's platform will be locked during normal web page generation context will be active at
@@ -151,7 +280,7 @@ public class GuiseHTTPServlet extends DefaultHTTPServlet {
 	public static final String DATA_APPLICATION_FILENAME = addExtension("application", TURF.NAME_EXTENSION);
 
 	static {
-		applicationIO = new PLOOPTURFIO<AbstractGuiseApplication>(AbstractGuiseApplication.class); //create the Guise application I/O
+		applicationIO = new PLOOPTURFIO<>(AbstractGuiseApplication.class); //create the Guise application I/O
 	}
 
 	/** The Guise container that owns the applications. */
@@ -188,7 +317,7 @@ public class GuiseHTTPServlet extends DefaultHTTPServlet {
 	/**
 	 * The initializer for initializing ELFF writers. This implementation writes the default directives along with the <code>Start-Date</code> directive.
 	 */
-	protected final IOOperation<Writer> elffWriterInitializer = new IOOperation<Writer>() {
+	protected final IOOperation<Writer> elffWriterInitializer = new IOOperation<>() {
 
 		/**
 		 * {@inheritDoc}
@@ -209,7 +338,7 @@ public class GuiseHTTPServlet extends DefaultHTTPServlet {
 	/**
 	 * The uninitializer for uninitializing ELFF writers. This implementation writes the <code>End-Date</code> directive.
 	 */
-	protected final IOOperation<Writer> elffWriterUninitializer = new IOOperation<Writer>() {
+	protected final IOOperation<Writer> elffWriterUninitializer = new IOOperation<>() {
 
 		/**
 		 * {@inheritDoc}
@@ -313,7 +442,7 @@ public class GuiseHTTPServlet extends DefaultHTTPServlet {
 		//TODO del when WebPlatform works		guiseApplication.installComponentKit(new XHTMLComponentKit());	//create and install an XHTML controller kit
 		//install configured environment properties
 		final Environment environment = guiseApplication.getEnvironment(); //get the application environment
-		final Enumeration<String> initParameterNames = (Enumeration<String>)servletContext.getInitParameterNames(); //get all the init parameter names from the servlet context, allowing all init parameters to be retrieved, even those stored externally
+		final Enumeration<String> initParameterNames = servletContext.getInitParameterNames(); //get all the init parameter names from the servlet context, allowing all init parameters to be retrieved, even those stored externally
 		while(initParameterNames.hasMoreElements()) { //while there are more init parameters
 			final String initParameterName = initParameterNames.nextElement(); //get the next init parameter
 			if(initParameterName.startsWith(GUISE_ENVIRONMENT_INIT_PARAMETER_PREFIX)) { //if this is a Guise parameter specification
@@ -599,7 +728,7 @@ public class GuiseHTTPServlet extends DefaultHTTPServlet {
 				//TODO del if not needed final HTTPServletWebDepictContext depictContext = new HTTPServletWebDepictContext(guiseRequest, response, guiseSession, resourceWriteDestination); //create a new Guise context
 				try {
 					final ServletFileUpload servletFileUpload = new ServletFileUpload(); //create a new servlet file upload object
-					final Set<Component> progressComponents = new HashSet<Component>(); //keep track of which components need to know about progress
+					final Set<Component> progressComponents = new HashSet<>(); //keep track of which components need to know about progress
 					final FileItemIterator itemIterator = servletFileUpload.getItemIterator(guiseRequest.getHTTPServletRequest()); //get an iterator to the file items
 					while(itemIterator.hasNext()) { //while there are more items
 						final FileItemStream fileItemStream = itemIterator.next(); //get the current file item
@@ -852,8 +981,8 @@ public class GuiseHTTPServlet extends DefaultHTTPServlet {
 				if(POST_METHOD.equals(guiseRequest.getHTTPServletRequest().getMethod()) && contentType != null
 						&& APPLICATION_X_WWW_FORM_URLENCODED_CONTENT_TYPE.hasBaseType(contentType) && !isGuisePOST) {
 					//TODO del Log.trace("using servlet parameter methods");
-					final List<Bookmark.Parameter> bookmarkParameterList = new ArrayList<Bookmark.Parameter>(); //create a new list of bookmark parameters
-					final Iterator<Map.Entry<String, String[]>> parameterEntryIterator = (Iterator<Map.Entry<String, String[]>>)guiseRequest.getHTTPServletRequest()
+					final List<Bookmark.Parameter> bookmarkParameterList = new ArrayList<>(); //create a new list of bookmark parameters
+					final Iterator<Map.Entry<String, String[]>> parameterEntryIterator = guiseRequest.getHTTPServletRequest()
 							.getParameterMap().entrySet().iterator(); //get an iterator to the parameter entries
 					while(parameterEntryIterator.hasNext()) { //while there are more parameter entries
 						final Map.Entry<String, String[]> parameterEntry = parameterEntryIterator.next(); //get the next parameter entry
@@ -873,11 +1002,11 @@ public class GuiseHTTPServlet extends DefaultHTTPServlet {
 				//TODO del Log.trace("ready to set navigation with new navigation path:", navigationPath, "navigation bookmark:", navigationBookmark, "referrerURI:", referrerURI);
 				guiseSession.setNavigation(navigationPath, navigationBookmark, referrerURI); //set the session navigation with the navigation bookmark, firing any navigation events if appropriate
 			}
-			final Set<Frame> removedFrames = new HashSet<Frame>(); //create a set of frames so that we can know which ones were removed TODO testing
+			final Set<Frame> removedFrames = new HashSet<>(); //create a set of frames so that we can know which ones were removed TODO testing
 			Collections.addAll(removedFrames, guiseSession.getApplicationFrame().getChildFrames().iterator()); //get all the current frames; we'll determine which ones were removed, later TODO improve all this
 			boolean isNavigating = false; //we'll check this later to see if we're navigating so we won't have to update all the components
 			for(final GuiseEvent requestEvent : requestEvents) { //for each request event
-				final Set<Component> requestedComponents = new HashSet<Component>(); //create a set of component that were identified in the request
+				final Set<Component> requestedComponents = new HashSet<>(); //create a set of component that were identified in the request
 				try {
 					if(requestEvent instanceof DepictEvent) { //if this is an event for a depicted object
 						DepictEvent depictEvent = (DepictEvent)requestEvent; //get the depict event TODO maybe make sure the the component is in the current hierarchy, if this is a component depict event
@@ -1005,8 +1134,8 @@ public class GuiseHTTPServlet extends DefaultHTTPServlet {
 							ELFF.appendURIQueryParameter(queryParametersStringBuilder, USER_LANGUAGE_QUERY_ATTRIBUTE_NAME, initControlEvent.getLanguage())
 									.append(QUERY_NAME_VALUE_PAIR_DELIMITER); //add WT.ul as a query parameter
 							//content groups and subgroups
-							final List<String> destinationCategoryIDs = new ArrayList<String>(); //we'll look for all the categories available
-							final List<String> destinationSubcategoryIDs = new ArrayList<String>(); //we'll look for all the subcategories available, in whatever category (because WebTrends doesn't distinguish among categories for subcategories)
+							final List<String> destinationCategoryIDs = new ArrayList<>(); //we'll look for all the categories available
+							final List<String> destinationSubcategoryIDs = new ArrayList<>(); //we'll look for all the subcategories available, in whatever category (because WebTrends doesn't distinguish among categories for subcategories)
 							for(final Category category : componentDestination.getCategories()) { //look at each category
 								//TODO del									Log.trace("destination has category", category.getID());
 								final String categoryID = category.getID(); //get this category's ID
@@ -1059,7 +1188,7 @@ public class GuiseHTTPServlet extends DefaultHTTPServlet {
 							final WebPlatform platform = (WebPlatform)guiseSession.getPlatform(); //get the current platform
 							final int pollInterval = platform.getPollInterval(); //get the current polling interval
 							final Queue<WebPlatformMessage> sendMessageQueue = platform.getSendMessageQueue(); //get the queue for sending messages
-							sendMessageQueue.add(new WebCommandMessage<PollCommand>(PollCommand.POLL_INTERVAL,
+							sendMessageQueue.add(new WebCommandMessage<>(PollCommand.POLL_INTERVAL,
 									new NameValuePair<String, Object>(PollCommand.INTERVAL_PROPERTY, Integer.valueOf(pollInterval)))); //send a poll command to the platform with the new interval
 						}
 						if(!requestedComponents.isEmpty()) { //if components were requested
@@ -1413,7 +1542,7 @@ public class GuiseHTTPServlet extends DefaultHTTPServlet {
 		final String applicationBasePathString = applicationBasePath.toString(); //we'll need the string version of the base path for later
 		final Environment environment = guiseSession.getPlatform().getEnvironment(); //get the platform's environment
 		final Cookie[] cookies = request.getCookies(); //get the cookies in the request
-		final Map<String, Cookie> cookieMap = new HashMap<String, Cookie>(cookies != null ? cookies.length : 0); //create a map to hold the cookies for quick lookup
+		final Map<String, Cookie> cookieMap = new HashMap<>(cookies != null ? cookies.length : 0); //create a map to hold the cookies for quick lookup
 		if(cookies != null) { //if a cookie array was returned
 			for(final Cookie cookie : cookies) { //for each cookie in the request
 				final String cookieName = cookie.getName(); //get the name of this cookie
@@ -1525,7 +1654,7 @@ public class GuiseHTTPServlet extends DefaultHTTPServlet {
 			final GuiseSession guiseSession, final DepictContext depictContext) throws IOException {
 		Log.trace("getting request events");
 		final WebPlatform platform = (WebPlatform)guiseSession.getPlatform(); //get the web platform
-		final List<GuiseEvent> requestEventList = new ArrayList<GuiseEvent>(); //create a new list for storing request events
+		final List<GuiseEvent> requestEventList = new ArrayList<>(); //create a new list for storing request events
 		/*TODO del
 				final String contentTypeString=request.getContentType();	//get the request content type
 				final ContentType contentType=contentTypeString!=null ? createContentType(contentTypeString) : null;	//create a content type object from the request content type, if there is one
@@ -1565,7 +1694,7 @@ public class GuiseHTTPServlet extends DefaultHTTPServlet {
 								if(depictedObjectID.length() > 0) { //if there is an object TODO add better event handling, to throw an error and send back that error
 									final DepictedObject depictedObject = platform.getDepictedObject(platform.getDepictID(depictedObjectID)); //look up the depicted object
 									if(depictedObject != null) { //if we know the depicted object
-										final Map<String, Object> properties = new HashMap<String, Object>(); //create a map of properties
+										final Map<String, Object> properties = new HashMap<>(); //create a map of properties
 										final NodeList propertyElementList = eventElement.getElementsByTagName("property"); //get a list of property elements
 										for(int propertyIndex = propertyElementList.getLength() - 1; propertyIndex >= 0; --propertyIndex) { //for each property element
 											final Element propertyElement = (Element)propertyElementList.item(propertyIndex); //get this property element
@@ -1763,7 +1892,7 @@ public class GuiseHTTPServlet extends DefaultHTTPServlet {
 				final ServletFileUpload servletFileUpload = new ServletFileUpload(fileItemFactory); //create a new servlet file upload handler
 				servletFileUpload.setFileSizeMax(-1); //don't reject anything
 				try { //try to parse the file items submitted in the request
-					final List<FileItem> fileItems = (List<FileItem>)servletFileUpload.parseRequest(request); //parse the request
+					final List<FileItem> fileItems = servletFileUpload.parseRequest(request); //parse the request
 					for(final FileItem fileItem : fileItems) { //look at each file item
 						final String parameterKey = fileItem.getFieldName(); //the parameter key will always be the field name
 						final Object parameterValue = fileItem.isFormField() ? fileItem.getString() : new FileItemResourceImport(fileItem); //if this is a form field, store it normally; otherwise, create a file item resource import object
@@ -1778,12 +1907,12 @@ public class GuiseHTTPServlet extends DefaultHTTPServlet {
 				if(!exhaustive || request.getParameter(WebApplicationFrameDepictor.getActionInputID(guiseSession.getApplicationFrame())) != null) { //if this is a POST, only use the data if it is a Guise POST
 					final WebFormEvent formSubmitEvent = new WebFormEvent(platform, exhaustive); //create a new form submission event
 					final CollectionMap<String, Object, List<Object>> parameterListMap = formSubmitEvent.getParameterListMap(); //get the map of parameter lists
-					final Iterator<Map.Entry<String, String[]>> parameterEntryIterator = ((Map<String, String[]>)request.getParameterMap()).entrySet().iterator(); //get an iterator to the parameter entries
+					final Iterator<Map.Entry<String, String[]>> parameterEntryIterator = request.getParameterMap().entrySet().iterator(); //get an iterator to the parameter entries
 					while(parameterEntryIterator.hasNext()) { //while there are more parameter entries
 						final Map.Entry<String, String[]> parameterEntry = parameterEntryIterator.next(); //get the next parameter entry
 						final String parameterKey = parameterEntry.getKey(); //get the parameter key
 						final String[] parameterValues = parameterEntry.getValue(); //get the parameter values
-						final List<Object> parameterValueList = new ArrayList<Object>(parameterValues.length); //create a list to hold the parameters
+						final List<Object> parameterValueList = new ArrayList<>(parameterValues.length); //create a list to hold the parameters
 						addAll(parameterValueList, parameterValues); //add all the parameter values to our list
 						parameterListMap.put(parameterKey, parameterValueList); //store the the array of values as a list, keyed to the value
 					}
@@ -1898,6 +2027,7 @@ public class GuiseHTTPServlet extends DefaultHTTPServlet {
 	 * @param nonce The nonce to check for validity.
 	 * @return <code>true</code> if the nonce is not valid.
 	 */
+	@Override
 	protected boolean isValid(final HttpServletRequest request, final Nonce nonce) { //TODO check to see if we want to force a session
 		//	TODO del Log.trace("ready to check validity of nonce; default validity", nonce);
 		if(!super.isValid(request, nonce)) { //if the nonce doesn't pass the normal validity checks
@@ -1998,7 +2128,7 @@ public class GuiseHTTPServlet extends DefaultHTTPServlet {
 						final String referrer=getReferer(request);	//get the request referrer, if any
 						final URI referrerURI=referrer!=null ? getPlainURI(URI.create(referrer)) : null;	//get a plain URI version of the referrer, if there is a referrer
 			*/
-			final ObjectHolder<Boolean> resourceExistsHolder = new ObjectHolder<Boolean>(); //create an object holder to receive the existence result
+			final ObjectHolder<Boolean> resourceExistsHolder = new ObjectHolder<>(); //create an object holder to receive the existence result
 			final GuiseSessionThreadGroup guiseSessionThreadGroup = Guise.getInstance().getThreadGroup(guiseSession); //get the thread group for this session
 			try {
 				call(guiseSessionThreadGroup, new Runnable() { //call the method in a new thread inside the thread group
@@ -2065,7 +2195,7 @@ public class GuiseHTTPServlet extends DefaultHTTPServlet {
 								final String referrer=getReferer(request);	//get the request referrer, if any
 								final URI referrerURI=referrer!=null ? getPlainURI(URI.create(referrer)) : null;	//get a plain URI version of the referrer, if there is a referrer
 				*/
-				final ObjectHolder<URFResource> destinationResourceDescriptionHolder = new ObjectHolder<URFResource>(); //create an object holder to receive the result of asking for the resource description
+				final ObjectHolder<URFResource> destinationResourceDescriptionHolder = new ObjectHolder<>(); //create an object holder to receive the result of asking for the resource description
 				final GuiseSessionThreadGroup guiseSessionThreadGroup = Guise.getInstance().getThreadGroup(guiseSession); //get the thread group for this session
 				try {
 					call(guiseSessionThreadGroup, new Runnable() { //call the method in a new thread inside the thread group
@@ -2115,7 +2245,7 @@ public class GuiseHTTPServlet extends DefaultHTTPServlet {
 
 		@Override
 		public InputStream getInputStream(final HttpServletRequest request) throws IOException {
-			final ObjectHolder<InputStream> inputStreamHolder = new ObjectHolder<InputStream>(); //create an object holder to receive the result of asking for the input stream
+			final ObjectHolder<InputStream> inputStreamHolder = new ObjectHolder<>(); //create an object holder to receive the result of asking for the input stream
 			final GuiseSessionThreadGroup guiseSessionThreadGroup = Guise.getInstance().getThreadGroup(guiseSession); //get the thread group for this session
 			try {
 				call(guiseSessionThreadGroup, new Runnable() { //call the method in a new thread inside the thread group

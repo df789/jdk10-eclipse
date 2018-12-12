@@ -16,27 +16,49 @@
 
 package io.guise.framework;
 
-import java.io.*;
-import java.net.*;
-import java.util.*;
+import static com.globalmentor.io.Files.addExtension;
+import static com.globalmentor.java.Java.PACKAGE_SEPARATOR;
+import static com.globalmentor.model.Locales.getLocaleCandidatePath;
+import static com.globalmentor.net.URIs.PATH_SEPARATOR;
+import static com.globalmentor.rdf.RDFResources.getLocalName;
+import static com.globalmentor.rdf.RDFResources.getNamespaceURI;
+import static com.globalmentor.rdf.RDFResources.getValue;
+import static com.globalmentor.util.PropertiesUtilities.PROPERTIES_NAME_EXTENSION;
+import static com.globalmentor.w3c.spec.XML.XML_NAME_EXTENSION;
+import static java.util.Objects.requireNonNull;
 
-import static java.util.Objects.*;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.MissingResourceException;
+import java.util.Properties;
+import java.util.ResourceBundle;
+import java.util.Set;
 
-import org.urframework.*;
+import org.urframework.URF;
+import org.urframework.URFListResource;
+import org.urframework.URFMapResource;
+import org.urframework.URFResource;
+import org.urframework.URFSetResource;
 
 import com.globalmentor.io.IO;
 import com.globalmentor.model.Locales;
 import com.globalmentor.net.Resource;
-import com.globalmentor.rdf.*;
+import com.globalmentor.rdf.RDFListResource;
+import com.globalmentor.rdf.RDFLiteral;
+import com.globalmentor.rdf.RDFObject;
+import com.globalmentor.rdf.RDFPropertyValuePair;
+import com.globalmentor.rdf.RDFResource;
+import com.globalmentor.rdf.RDFTypedLiteral;
 import com.globalmentor.util.HashMapResourceBundle;
-
-import static com.globalmentor.io.Files.*;
-import static com.globalmentor.java.Java.*;
-import static com.globalmentor.model.Locales.*;
-import static com.globalmentor.net.URIs.*;
-import static com.globalmentor.rdf.RDFResources.*;
-import static com.globalmentor.util.PropertiesUtilities.*;
-import static com.globalmentor.w3c.spec.XML.*;
 
 /**
  * Utilities for working with resource bundles.
@@ -193,7 +215,7 @@ public class ResourceBundles //TODO moved out of globalmentor-core to allow org.
 	 * @return A map with contents reflecting the property/value pairs of the given resource.
 	 */
 	public static Map<String, Object> toMap(final RDFResource rdfResource, final URI rdfPropertyNamespaceURI) {
-		final HashMap<String, Object> resourceHashMap = new HashMap<String, Object>(rdfResource.getPropertyCount()); //create a new hash map with enough initial room for all properties
+		final HashMap<String, Object> resourceHashMap = new HashMap<>(rdfResource.getPropertyCount()); //create a new hash map with enough initial room for all properties
 		for(final RDFPropertyValuePair propertyValuePair : rdfResource.getProperties()) { //for each resource property/value pair
 			final RDFResource property = propertyValuePair.getProperty(); //get the property
 			final URI propertyURI = property.getURI(); //get the property URI
@@ -228,7 +250,7 @@ public class ResourceBundles //TODO moved out of globalmentor-core to allow org.
 			return rdfPropertyValue instanceof RDFTypedLiteral ? ((RDFTypedLiteral<?>)rdfPropertyValue).getValue() : ((RDFLiteral)rdfPropertyValue).getLexicalForm(); //get the typed literal object if this is a typed literal
 		} else if(rdfPropertyValue instanceof RDFListResource) { //if the property value is a list
 			final RDFListResource<?> listResource = (RDFListResource<?>)rdfPropertyValue; //get the property value as a list
-			final List<Object> list = new ArrayList<Object>(listResource.size()); //create a new list
+			final List<Object> list = new ArrayList<>(listResource.size()); //create a new list
 			for(final RDFObject elementResource : listResource) { //for each element in the list resource
 				list.add(getResourceValue(elementResource)); //convert the element resource to a resource value and add it to the list
 			}
@@ -269,7 +291,7 @@ public class ResourceBundles //TODO moved out of globalmentor-core to allow org.
 	public static Map<String, Object> toMap(final URFResource urfResource, final URI urfPropertyNamespaceURI) {
 		urfResource.readLock().lock(); //get a read lock on the resource
 		try {
-			final HashMap<String, Object> resourceHashMap = new HashMap<String, Object>((int)urfResource.getPropertyValueCount()); //create a new hash map with enough initial room for all properties
+			final HashMap<String, Object> resourceHashMap = new HashMap<>((int)urfResource.getPropertyValueCount()); //create a new hash map with enough initial room for all properties
 			for(final URI propertyURI : urfResource.getPropertyURIs()) { //look at each resource property URI; we'll only use the first value for each unique property URI
 				if(propertyURI != null && urfPropertyNamespaceURI.equals(URF.getNamespaceURI(propertyURI))) { //if this property is in the requested namespace
 					final String resourceKey = URF.getLocalName(propertyURI); //use the local name as the resource key
@@ -299,21 +321,21 @@ public class ResourceBundles //TODO moved out of globalmentor-core to allow org.
 	public static <T> T getResourceValue(final URFResource urfPropertyValue) {
 		if(urfPropertyValue instanceof URFListResource) { //if the property value is an URF list
 			final URFListResource<?> listResource = (URFListResource<?>)urfPropertyValue; //get the property value as an URF list
-			final List<Object> list = new ArrayList<Object>(); //create a new list
+			final List<Object> list = new ArrayList<>(); //create a new list
 			for(final URFResource elementResource : listResource) { //for each element in the list resource
 				list.add(getResourceValue(elementResource)); //convert the element resource to a resource value and add it to the list
 			}
 			return (T)list; //return the list
 		} else if(urfPropertyValue instanceof URFSetResource) { //if the property value is an URF set
 			final URFSetResource<?> setResource = (URFSetResource<?>)urfPropertyValue; //get the property value as an URF set
-			final Set<Object> set = new HashSet<Object>(); //create a new set
+			final Set<Object> set = new HashSet<>(); //create a new set
 			for(final URFResource elementResource : setResource) { //for each element in the set resource
 				set.add(getResourceValue(elementResource)); //convert the element resource to a resource value and add it to the set
 			}
 			return (T)set; //return the set
 		} else if(urfPropertyValue instanceof URFMapResource) { //if the property value is an URF map
 			final URFMapResource<?, ?> mapResource = (URFMapResource<?, ?>)urfPropertyValue; //get the property value as an URF map
-			final Map<Object, Object> map = new HashMap<Object, Object>(); //create a new map
+			final Map<Object, Object> map = new HashMap<>(); //create a new map
 			for(final Map.Entry<? extends URFResource, ? extends URFResource> mapEntry : mapResource.entrySet()) { //for each entry in the map resource
 				final Object keyObject = getResourceValue(mapEntry.getKey()); //convert the key resource to a resource value
 				final Object valueObject = getResourceValue(mapEntry.getValue()); //convert the value resource to a resource value

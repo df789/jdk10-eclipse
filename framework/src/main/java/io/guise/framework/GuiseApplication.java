@@ -16,9 +16,24 @@
 
 package io.guise.framework;
 
-import java.io.*;
-import java.net.*;
-import java.util.*;
+import static com.globalmentor.java.Classes.getPropertyName;
+
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.Writer;
+import java.net.URI;
+import java.net.URL;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Properties;
+import java.util.Queue;
+import java.util.ResourceBundle;
+import java.util.Set;
+import java.util.UUID;
 
 import javax.mail.Message;
 import javax.mail.Session;
@@ -33,10 +48,9 @@ import com.globalmentor.net.URIs;
 
 import io.csar.Concerned;
 import io.guise.framework.component.ApplicationFrame;
-import io.guise.framework.platform.*;
+import io.guise.framework.platform.Environment;
+import io.guise.framework.platform.Platform;
 import io.guise.framework.theme.Theme;
-
-import static com.globalmentor.java.Classes.*;
 
 /**
  * An application running Guise. To enable mail-related functionality, mail must be configured using {@link #setMailProperties(Map)}.

@@ -16,24 +16,27 @@
 
 package io.guise.framework;
 
-import java.io.*;
-import java.lang.ref.*;
-import java.net.*;
+import static com.globalmentor.io.InputStreams.getBytes;
+import static com.globalmentor.java.Characters.TRADE_MARK_SIGN_CHAR;
+import static com.globalmentor.java.Conditions.checkConfigurationNotNull;
+import static com.globalmentor.net.URIs.normalizePath;
+import static com.globalmentor.util.PropertiesUtilities.loadPropertiesResource;
+import static org.urframework.URF.createResourceURI;
+
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.ref.Reference;
+import java.lang.ref.SoftReference;
+import java.net.URI;
+import java.net.URL;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 
-import static com.globalmentor.io.InputStreams.*;
-import static com.globalmentor.java.Characters.*;
-import static com.globalmentor.java.Conditions.*;
-
 import com.globalmentor.iso.datetime.ISODate;
 import com.globalmentor.java.Threads;
 import com.globalmentor.model.ConfigurationException;
-
-import static com.globalmentor.net.URIs.*;
-import static com.globalmentor.util.PropertiesUtilities.*;
-import static org.urframework.URF.*;
 
 /**
  * The singleton Guise class. There will only be one instance of Guise per JVM.
@@ -112,7 +115,7 @@ public final class Guise {
 	}
 
 	/** The cache of asset references keyed to asset strings. */
-	private Map<String, Reference<byte[]>> assetMap = new ConcurrentHashMap<String, Reference<byte[]>>();
+	private Map<String, Reference<byte[]>> assetMap = new ConcurrentHashMap<>();
 
 	/**
 	 * Retrieves a Guise asset keyed to its location. Assets are cached for quick future retrieval. Due to race conditions, an asset may initially be loaded more
@@ -134,7 +137,7 @@ public final class Guise {
 			final InputStream assetInputStream = getClass().getResourceAsStream(key); //get an input stream to the asset
 			if(assetInputStream != null) { //if we got an input stream to the asset
 				asset = getBytes(assetInputStream); //load the asset
-				assetMap.put(key, new SoftReference<byte[]>(asset)); //cache the asset
+				assetMap.put(key, new SoftReference<>(asset)); //cache the asset
 			}
 		}
 		return asset; //return whatever asset we found
@@ -192,7 +195,7 @@ public final class Guise {
 	}
 
 	/** The thread-safe map of Guise session thread groups for Guise sessions. */
-	private final Map<GuiseSession, GuiseSessionThreadGroup> sessionThreadGroupMap = new ConcurrentHashMap<GuiseSession, GuiseSessionThreadGroup>();
+	private final Map<GuiseSession, GuiseSessionThreadGroup> sessionThreadGroupMap = new ConcurrentHashMap<>();
 
 	/**
 	 * Adds a Guise session and creates an associated thread group. This method creates a thread group for the session.

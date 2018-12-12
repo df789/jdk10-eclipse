@@ -117,6 +117,14 @@
 		<pluginManagement>
 			<plugins>
 				<plugin>
+					<artifactId>maven-compiler-plugin</artifactId>
+					<configuration>
+						<source>10</source>
+						<target>10</target>
+					</configuration>
+				</plugin>
+
+				<plugin>
 					<groupId>org.codehaus.mojo</groupId>
 					<artifactId>buildnumber-maven-plugin</artifactId>
 					<version>1.4</version>
@@ -186,4 +194,9 @@
 			</plugins>
 		</pluginManagement>
 	</build>
+	
+	<properties>
+	    <maven.compiler.target>10</maven.compiler.target>
+	    <maven.compiler.source>10</maven.compiler.source>
+	</properties>
 </project>

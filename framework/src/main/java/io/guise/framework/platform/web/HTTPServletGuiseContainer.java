@@ -16,17 +16,33 @@
 
 package io.guise.framework.platform.web;
 
-import static java.util.Arrays.*;
-import static java.util.Collections.*;
-import static java.util.Objects.*;
+import static com.globalmentor.net.URIs.PATH_SEPARATOR;
+import static com.globalmentor.net.URIs.ROOT_PATH;
+import static com.globalmentor.net.URIs.getPlainURI;
+import static com.globalmentor.net.URIs.isAbsolutePath;
+import static com.globalmentor.net.URIs.normalizePath;
+import static com.globalmentor.net.URIs.resolve;
+import static com.globalmentor.servlet.Servlets.WEB_INF_DIRECTORY_PATH;
+import static com.globalmentor.servlet.http.HTTPServlets.getAcceptedLanguages;
+import static java.util.Arrays.asList;
+import static java.util.Collections.emptySet;
+import static java.util.Collections.synchronizedMap;
+import static java.util.Objects.requireNonNull;
 
-import java.io.*;
-import java.net.*;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.MalformedURLException;
+import java.net.URI;
 import java.security.Principal;
-import java.util.*;
+import java.util.HashMap;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 
-import javax.servlet.*;
-import javax.servlet.http.*;
+import javax.servlet.ServletContext;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpSession;
 
 import com.globalmentor.collections.DecoratorReadWriteLockCollectionMap;
 import com.globalmentor.collections.DecoratorReadWriteLockMap;
@@ -35,13 +51,11 @@ import com.globalmentor.collections.ReadWriteLockCollectionMap;
 import com.globalmentor.collections.ReadWriteLockMap;
 import com.globalmentor.log.Log;
 import com.globalmentor.model.AbstractProxyHashObject;
-import com.globalmentor.net.URIPath;
 
-import io.guise.framework.*;
-
-import static com.globalmentor.net.URIs.*;
-import static com.globalmentor.servlet.Servlets.*;
-import static com.globalmentor.servlet.http.HTTPServlets.*;
+import io.guise.framework.AbstractGuiseApplication;
+import io.guise.framework.AbstractGuiseContainer;
+import io.guise.framework.GuiseApplication;
+import io.guise.framework.GuiseSession;
 
 /**
  * A Guise container for Guise HTTP servlets. There will be one servlet Guise container per {@link ServletContext}, which usually corresponds to a single web
@@ -126,7 +140,7 @@ public class HTTPServletGuiseContainer extends AbstractGuiseContainer {
 	 * The read/write lock map of Guise sessions keyed to Guise applications and HTTP sessions (as a single HTTP session may be used across different Guise
 	 * applications within one container).
 	 */
-	private final ReadWriteLockMap<GuiseApplicationHTTPSessionKey, GuiseSession> httpSessionGuiseApplicationGuiseSessionMap = new DecoratorReadWriteLockMap<GuiseApplicationHTTPSessionKey, GuiseSession>(
+	private final ReadWriteLockMap<GuiseApplicationHTTPSessionKey, GuiseSession> httpSessionGuiseApplicationGuiseSessionMap = new DecoratorReadWriteLockMap<>(
 			new HashMap<GuiseApplicationHTTPSessionKey, GuiseSession>());
 
 	/**
@@ -134,7 +148,7 @@ public class HTTPServletGuiseContainer extends AbstractGuiseContainer {
 	 * same HTTP session. This set map is only accessed when a Guise session is being added or removed, so its locks should not slow down normal HTTP requests.
 	 * The sets within the map are not thread-safe, so all access to iterables of values should be performed after retrieving a read lock.
 	 */
-	private final ReadWriteLockCollectionMap<HttpSession, GuiseSession, Set<GuiseSession>> httpSessionGuiseSessionSetMap = new DecoratorReadWriteLockCollectionMap<HttpSession, GuiseSession, Set<GuiseSession>>(
+	private final ReadWriteLockCollectionMap<HttpSession, GuiseSession, Set<GuiseSession>> httpSessionGuiseSessionSetMap = new DecoratorReadWriteLockCollectionMap<>(
 			new HashSetHashMap<HttpSession, GuiseSession>());
 
 	/**
